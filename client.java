@@ -15,6 +15,10 @@ public class client {
         DataInputStream dis = new DataInputStream(s.getInputStream());
         DataOutputStream dos = new DataOutputStream(s.getOutputStream());
 
+        System.out.print("Enter your username: ");
+        String name = scn.nextLine();
+        dos.writeUTF(name);
+
         Thread sendMessage = new Thread(new Runnable() {
             @Override
             public void run() {

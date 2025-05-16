@@ -16,3 +16,25 @@ client 0 to recipient: list
 client 0 to recipient: r/join 1775
 client 0 to recipient: r/create
 client 0 to recipient: logout
+client 0 to recipient: list
+client 0 to recipient: history
+client 0 to recipient: logout
+client 2 to recipient: list
+client 2 to recipient: r/join 7672
+client 2 to recipient: list
+client 2 to recipient: logout
+client 3 to recipient: list
+client 3 to recipient: @1 hello brother
+client 3 to recipient: @client 1 hellobrother
+client 3 to recipient: logout
+client 1 to recipient: list
+client 1 to recipient: r/create
+client 1 to recipient: /broadcast hellp
+client 1 to recipient: /broadcast hello
+client 1 to recipient: hello
+client 1 to recipient: history
+client 1 to recipient: @client3 how are you
+client 1 to recipient: logout
+client 1 to recipient: list
+client 1 to recipient: @client0 hello
+client 0 to recipient: list

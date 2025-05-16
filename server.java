@@ -24,10 +24,11 @@ public class server {
 
             System.out.println("Creating a new handler for this client...");
 
-            ClientHandler mtch = new ClientHandler(s, "client " + i, dis, dos);
+            String name = dis.readUTF();
+            ClientHandler mtch = new ClientHandler(s, name, dis, dos);
             Thread t = new Thread(mtch);
 
-            System.out.println("Adding this client to active client list");
+            System.out.println("Adding this client to active clients");
 
             array.add(mtch);
 
@@ -111,6 +112,17 @@ class ClientHandler implements Runnable {
                 }
                 dos.writeUTF(userList.toString());
             }
+            if (received.startsWith("@")) {
+                String[] split = received.split(" ", 2);
+                String targetUser = split[0].substring(1);
+                String message = split[1];
+
+                for (ClientHandler ch : server.array) {
+                    if (ch.name.equals(targetUser) && ch.isloggedin) {
+                        ch.dos.writeUTF("[Private] " + this.name + ": " + message);
+                    }
+                }
+            }
 
             if (received.equals("r/create")) {
                 String roomname = "room_" + new Random().nextInt(10000);
@@ -152,7 +164,7 @@ class ClientHandler implements Runnable {
             if (received.equals("history")) {
                 try (Scanner sc = new Scanner(new File("chat_log.txt"))) {
                     while (sc.hasNextLine() && N > 0) {
-                        System.out.println(sc.nextLine());
+                        dos.writeUTF(sc.nextLine());
                         N--;
                     }
                 } catch (FileNotFoundException e) {
