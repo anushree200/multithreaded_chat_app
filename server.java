@@ -35,7 +35,6 @@ public class server {
             t.start();
 
             i++;
-
         }
     }
 }
@@ -48,6 +47,8 @@ class ClientHandler implements Runnable {
     Socket s;
     boolean isloggedin;
     public static ConcurrentHashMap<String, Map<String, Set<ClientHandler>>> rooms = new ConcurrentHashMap<>();
+    private Set<String> joinedRooms = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private String currentRoom = null;
 
     public ClientHandler(Socket s, String name, DataInputStream dis, DataOutputStream dos) {
         this.dis = dis;
@@ -127,21 +128,108 @@ class ClientHandler implements Runnable {
             if (received.equals("r/create")) {
                 String roomname = "room_" + new Random().nextInt(10000);
                 rooms.put(roomname, new ConcurrentHashMap<>());
+                rooms.get(roomname).put("clients", Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 System.out.println("Room created: " + roomname);
                 dos.writeUTF("Room created: " + roomname);
             }
 
             if (received.startsWith("r/join ")) {
-                String[] parts = received.split(" ");
+                String[] parts = received.split(" ", 2);
                 if (parts.length == 2) {
                     String roomasked = parts[1];
                     rooms.computeIfAbsent(roomasked, k -> new ConcurrentHashMap<>())
-                            .computeIfAbsent("clients", k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
-                            .add(this);
-                    System.out.println(this.name + " joined " + roomasked);
+                            .computeIfAbsent("clients", k -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
+                    if (joinedRooms.add(roomasked)) {
+                        rooms.get(roomasked).get("clients").add(this);
+                        if (currentRoom == null) {
+                            currentRoom = roomasked;
+                        }
+                        System.out.println(this.name + " joined " + roomasked);
+                        dos.writeUTF("Joined room: " + roomasked);
+                    } else {
+                        dos.writeUTF("You are already in room: " + roomasked);
+                    }
                 } else {
-                    System.out.println("Invalid room join request.");
+                    dos.writeUTF("Invalid room join request. Use: r/join <roomname>");
                 }
+            }
+            if (received.equals("r/list")) {
+                StringBuilder roomList = new StringBuilder("Your joined rooms:\n");
+                if (joinedRooms.isEmpty()) {
+                    roomList.append("No rooms joined.");
+                } else {
+                    for (String room : joinedRooms) {
+                        roomList.append(room);
+                        if (room.equals(currentRoom)) {
+                            roomList.append(" (current)");
+                        }
+                        roomList.append("\n");
+                    }
+                }
+                dos.writeUTF(roomList.toString());
+            }
+
+            if (received.equals("r/whothere")) {
+                if (currentRoom == null) {
+                    dos.writeUTF("No current room selected. Use r/switch or r/join first.");
+                    return;
+                }
+                StringBuilder clientList = new StringBuilder("Who are there in this room (" + currentRoom + "):\n");
+                Map<String, Set<ClientHandler>> room = rooms.get(currentRoom);
+                if (room == null || room.get("clients") == null || room.get("clients").isEmpty()) {
+                    clientList.append("No one is in this room.");
+                } else {
+                    for (ClientHandler client : room.get("clients")) {
+                        if (client.isloggedin) {
+                            clientList.append(client.name).append("\n");
+                        }
+                    }
+                }
+                dos.writeUTF(clientList.toString());
+            }
+
+            if (received.startsWith("r/switch ")) {
+                String[] parts = received.split(" ", 2);
+                if (parts.length == 2) {
+                    String roomName = parts[1];
+                    if (joinedRooms.contains(roomName)) {
+                        currentRoom = roomName;
+                        dos.writeUTF("Switched to room: " + roomName);
+                    } else {
+                        dos.writeUTF("You are not in room: " + roomName);
+                    }
+                } else {
+                    dos.writeUTF("Invalid switch request. Use: r/switch <roomname>");
+                }
+            }
+            if (received.startsWith("r/leave ")) {
+                String[] parts = received.split(" ", 2);
+                if (parts.length == 2) {
+                    String roomName = parts[1];
+                    if (joinedRooms.remove(roomName)) {
+                        rooms.get(roomName).get("clients").remove(this);
+                        if (roomName.equals(currentRoom)) {
+                            currentRoom = joinedRooms.isEmpty() ? null : joinedRooms.iterator().next();
+                        }
+                        System.out.println(this.name + " left " + roomName);
+                        dos.writeUTF("Left room: " + roomName);
+                        if (currentRoom != null) {
+                            dos.writeUTF("Current room set to: " + currentRoom);
+                        }
+                    } else {
+                        dos.writeUTF("You are not in room: " + roomName);
+                    }
+                } else {
+                    dos.writeUTF("Invalid leave request. Use: r/leave <roomname>");
+                }
+            }
+            if (received.startsWith("r/send ")) {
+                if (currentRoom == null) {
+                    dos.writeUTF("No current room selected. Use r/switch or r/join first.");
+                    return;
+                }
+                String message = received.substring(7);
+                sendToRoom(currentRoom, message);
             }
 
             if (received.startsWith("/file")) {
@@ -178,6 +266,24 @@ class ClientHandler implements Runnable {
         }
     }
 
+    private void sendToRoom(String roomName, String message) {
+        Map<String, Set<ClientHandler>> room = rooms.get(roomName);
+        if (room != null) {
+            Set<ClientHandler> clients = room.get("clients");
+            if (clients != null) {
+                for (ClientHandler client : clients) {
+                    if (client != this && client.isloggedin) {
+                        try {
+                            client.dos.writeUTF("[" + roomName + "] " + this.name + ": " + message);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void broadcast(String message) {
         for (ClientHandler client : server.array) {
             if (client != this && client.isloggedin) {
@@ -189,4 +295,5 @@ class ClientHandler implements Runnable {
             }
         }
     }
+
 }

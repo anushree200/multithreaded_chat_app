@@ -38,3 +38,13 @@ client 1 to recipient: logout
 client 1 to recipient: list
 client 1 to recipient: @client0 hello
 client 0 to recipient: list
+john to recipient: list
+john to recipient: @list hello
+john to recipient: \broadcast hello people
+john to recipient: /broadcast hello people
+john to recipient: logout
+list to recipient: list
+list to recipient: @john hello brother
+list to recipient: logout
+thirdperson to recipient: list
+thirdperson to recipient: logout
